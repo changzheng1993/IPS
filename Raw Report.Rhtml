@@ -1,0 +1,246 @@
+<html>
+
+<head>
+<title>Predicting Location via a Statistical Indoor Positioning System</title>
+</head>
+
+<body>
+
+<h1>Predicting Location via a Statistical Indoor Positioning System</h1>
+
+<h2>Introduction</h2>
+
+<p>
+    As the technology developes, Wireless is one of the most important tools in our life. In this project, we will build a model to predict location to develop indoor positioning systems (IPS). IPS is a solution to locate people inside a building by using signal strength. </p>
+<p> 
+    In order to predict the location, we need a banch of data where the signal strength between hand-held device such as labtop, routers, and cell phone are measured in the building. Then, we build a model to examine the signals strength within a building at the University of Mannheim. Based on the model, we can predict location with these data to develop a statistical IPS . 
+</p>
+
+<h2>Background</h2>
+
+<p>
+      We use k-nearest neighbors to predict location (x,y), and then use cross-validation to find a best k. In order to measure distance, we come up Euclidean distance to estimate the distance between two sets of signal strengths. Then we find k closest training points , and then we estimate new observation’s position by an aggregate of the (x, y) positions of the k training points. Then, cross-validation can help us to determine the best k. Cross-validation is a statistical model to evaluate by dividng two grops; one is using train a model and other used to valid the model. The technique is assessing how the outputs generalize an independent data set. Finally, after we find a best K from offline.txt,  we apply the data to online data, which is true data. Then we assessw how the best k fits with the true data.
+</p>
+
+<h2>Processsing and Cleaning Data to Build a Representation for Analysis</h2>
+<h3>Task 1</h3>
+<p>
+First, we read offline.final.trace.txt into R. We found that the data is extremely big.
+<!--begin.rcode echo=FALSE 
+load("Report")
+head(txt)
+end.rcode-->
+</p>
+
+<p>
+    When we executed head(txt) function, we found that some characters are not necessary. 
+That is "#" character. Therefore, We discard the sentences starting with the comment character ‘#’. We also found that the variable of the “name” is separated by an ‘=’ character, some values that contain multiple values are seperated by ‘,’ , and also some variables are seperated by ';' character. Therefore, We use regular expression to process the raw data.
+</p>
+<p>
+     In the function of processline of MAC1, the elements, except the first 10, give the information of the signals received at the same time, same postion and the same hand- held device. We extract these variables and create a 4 columns matrix, indicting each particular mac address, signal value, channel and type for each signal that detected. The number of signals that detected will then be the number of rows. For MAC2, we only extract the mac address, physical coordinates and the time for the scanning point and create a matrix in the first 10 elements. These information are indicated by 6 variables, so we will have 6 columns.
+</p> 
+<p>    
+      Finally, We combine these information with MAT1 and create and a matrix, so that the the new matrix will give information for each signal detected from the same scannning point.
+</p>
+
+<h3>Task 2</h3>
+
+<p>
+   1. We found that the type of time, posX, posY, posZ, orientation and signal varable is all character, also they are all numbers. It is a good idea converting them to numeric because it will help us to analyze data in next section. Therefore, We converted them all into the type of numeric. 
+</p>
+<p>
+    2. According to the data, we found that the variable of time is measured by milliseconds. It was not readable if we want to see the pattern of some variables, for example, two macs was recording at the same time and location. Therefore, we frist converted milliseconds to seconds by dividing 100, and then, we used POSIXt, POSIXct to convert seconds to readable dates plus time, e.g. 2006-02-10 23:31:58
+</p> 
+<p>
+    3. Accounding to documentation, we need to drop all records that correspond to adhoc devices, and not the access points. We also found the all of posZ are zero ,and scanMac has only one value. Therefore, we discarded these 2. Right now, we only keep "time","posX", "posY", "posZ", "orientation", "signal" as variables. 
+</p>
+<p>
+    4. Accounding to documentation, we also need to round the values for orientation to the nearest 45 degrees, but keep the original values too.
+</p> 
+<p>
+    5. After we narrowed down the Mac numbers(by unique function), we found 12 Mac numbers. Rereading the documentation, we need only 6 Mac numbers, so we looked up the MAC addresses at http://coffer.com/mac find/, and we only found 5 MAC addresses which are all Linksys/Cisco's, there was no Mac numbers matching with Lancom L-54g routers. Therefore, we had to find the sixth mac number. 
+</p>
+<h4>First 12 Mac numbers</h4>
+<p>
+First, we check the 12 Mac numbers by listing a table. </p>
+<p>00:04:0e:5c:23:fc : 418</p>
+<p>00:0f:a3:39:dd:cd : 14145619 </p>
+<p>00:0f:a3:39:e0:4b : 43508</p>
+<p>00:0f:a3:39:e1:c0 : 145862</p>
+<p>00:0f:a3:39:e2:10 : 19162  </p>
+<p>00:14:bf:3b:c7:c6 : 126529 </p>
+<p>00:14:bf:b1:97:81 : 120339 </p>
+<p>00:14:bf:b1:97:8a : 132962 </p>
+<p>00:14:bf:b1:97:8d : 121325</p>
+<p>00:14:bf:b1:97:90 : 122315 </p>
+<p>00:30:bd:f8:7f:c5 : 301 </p>
+<p>00:e0:63:82:8b:a9 : 103</p>
+
+<p>
+According to the table, there are 12 mac addresses. However, some mac addresses counts are extremely low since there are signals recorded at 166 grid points, 110 replications, and 8 orientations. Therefore, the count of the each addresses should be around 166 * 110 * 8, which is 146080. Hence, we will select "00:0f:a3:39:e1:c0", "00:0f:a3:39:dd:cd", "00:14:bf:b1:97:8a", "00:14:bf:3b:c7:c6", "00:14:bf:b1:97:90","00:14:bf:b1:97:8d", "00:14:bf:b1:97:81" as macAddress. But, it still have 7 Mac numbers there. We only need 6!!  </p>
+
+<h4>Second Mapping 7 Mac numbers</h4>
+<p>After we selected 7 Mac numbers, we want to know where the 7 macs located on. So we were using the heat plot to map all 7 access points. We found that there are 2 access points at almost the same location. (see 4 plots below)
+
+<!--begin.rcode echo=FALSE, warning=FALSE, , message=FALSE, fig.width=5, fig.height=5 
+library(fields)
+library(spam)
+library(grid)
+library(maps)
+heatPlot = function(data , ma, an){
+  
+  data = data[data$mac == ma, ]
+  data = data[data$angle == an, ]
+  
+  smoothSS = Tps(data[, c("posX","posY")], data$meanSignal)
+  
+  vizSmooth = predictSurface(smoothSS)
+  
+  plot.surface(vizSmooth, type = "C")
+  
+  points(data$posX, data$posY, pch=19, cex = 0.5)
+}
+
+parCur = par(mfrow = c(2,2), mar = rep(1, 4))
+par(parCur)
+a = heatPlot(offlineSet, subMacs[2], 0)
+b = heatPlot(offlineSet, subMacs[2],90)
+c = heatPlot(offlineSet, subMacs[1], 0)
+d = heatPlot(offlineSet, subMacs[1],90)
+end.rcode-->
+<p>The first two plots are 00:0f:a3:39:dd:cd with angle degree 0 and 90, The second two plots are 00:0f:a3:39:e1:c0 with angle degree0 and 90. The dark red color is the location of access point. The location points are mapped also, which helped us to see every locations related to the floor plan. </p>
+
+<h4>Third Dropping 00:0f:a3:39:dd:cd </h4>
+<p>We want to know why they are at same location. So, we were tring to see how the time variable connect to the 2 
+access points. By doing this, we created a data frame with only 2 variable time and mac numbers. 
+<!--begin.rcode fig.width=7, fig.height=6, echo=FALSE
+aaa = offlineSet
+aaa = aaa[aaa$mac == '00:0f:a3:39:dd:cd' | aaa$mac == '00:0f:a3:39:e1:c0', ]
+aaa = aaa[with(aaa,order(time)), ]
+aaa = aaa[, -c(2, 3, 4, 6, 7, 8, 9, 10, 11)]
+head(aaa)
+end.rcode-->
+From these 6 rows, it seems like 2 access points were recording at the same time. To prove that, we explored length of each mac and time(unique). We found these two are almost evenly separate. It may have some empty records or repeated records. 
+<p>the length of 00:0f:a3:39:dd:cd is 1328</p>
+<!--begin.rcode fig.width=7, fig.height=6, echo=FALSE
+dim(aaa[aaa$mac == '00:0f:a3:39:dd:cd',])
+end.rcode-->
+<p>the length of 00:0f:a3:39:e1:c0 is 1328</p>
+<!--begin.rcode fig.width=7, fig.height=6, echo=FALSE
+dim(aaa[aaa$mac == '00:0f:a3:39:e1:c0',])
+end.rcode-->
+<p>the length of time is 1342</p>
+<!--begin.rcode fig.width=7, fig.height=6, echo=FALSE
+length(unique(aaa$time))
+end.rcode-->
+<p/>
+
+<p>Right now, we known that there were 2 devices at same location. However, we still need to drop one to reach 6 Macs' goal. By doing this step, we need to find which device has a stable signals which will less affect our result in the next section. We created two signal strengths at a location where are far from this access point(2, 12) </p>
+<!--begin.rcode echo=FALSE, warning=FALSE, , message=FALSE, fig.width=11, fig.height=7
+library(lattice)
+bwplot(signal ~ factor(angle) | mac, data = offline,
+        subset = posX == 2 & posY == 12
+        & mac == c("00:0f:a3:39:dd:cd", "00:0f:a3:39:e1:c0"),
+        layout = c(2,1))
+end.rcode-->
+<p>The two graphs show that the relationships between orientations and signal strength. We used this two graphs to choose which macAddress is stable. According to the graph, the macAddress "00:0f:a3:39:dd:cd" has lower mean of the signal. On the other hand, the "00:0f:a3:39:e1:c0" has higher mean of the signal. Therefore, the signal strength of "00:0f:a3:39:e1:c0" is stronger than "00:0f:a3:39:dd:cd" signal strength. </p>
+<p>
+In addition, the variance of "00:0f:a3:39:dd:cd" is higher than the variance of "00:0f:a3:39:e1:c0". Hence, "00:0f:a3:39:e1:c0" is more stable than "00:0f:a3:39:dd:cd". Therefore, we drop "00:0f:a3:39:dd:cd". 
+</p>
+
+
+
+
+<h2>Visualization of Signal Strength Analysis</h2>
+
+<p>
+<!--begin.rcode echo=FALSE, fig.width=9, fig.height=11
+densityplot( ~ signal | mac + factor(angle), data = offline,
+             subset = posX == 2 & posY == 2 &
+               mac != "00:0f:a3:39:dd:cd" & mac !=  "00:14:bf:b1:97:81" & 
+               mac != "00:14:bf:3b:c7:c6" & mac !=  "00:14:bf:b1:97:90",
+             bw = 0.5, plot.points = FALSE)
+end.rcode-->
+<p>  
+  We choose  macAddress '00:0f:a3:39:e1:c0',"00:14:bf:b1:97:8a" and "00:14:bf:b1:97:8d" at position (2,2) to estimate the signal strength. The point(2,2) is close to "00:14:bf:b1:97:8a", "00:14:bf:b1:97:8d" is far from the point(2,2). Therefore, we mark "00:14:bf:b1:97:8a" as close point, "00:0f:a3:39:e1:c0" as a middle point, "00:14:bf:b1:97:8d" as far point. Accoding to the data, "00:14:bf:b1:97:8a" has the strongest sginal strength, and "00:14:bf:b1:97:8d" has the weakest signal strength. Therefore, it proofs that signal strength behaves diffrently at all locations. Distance affects the signal strength. Far position has a weaker signal and close position has a stronger signal strength. 
+</p>
+<p>
+  Furthermore, the three graphs also show that the orientation does not affect sginal strength significantly. Although each density curve is slightly different, the signal strength is almost same at each diffrent angle. 
+  Therefore, the level of the signal strength does not depend on the orientation, and it does depend on distance. The location and access point will affect the distribution, but the orientation does not affect the distribution significantly. 
+</p>
+
+<p>
+<!--begin.rcode echo=FALSE, fig.width=10, fig.height=9 
+xyplot(signal ~ dist | factor(mac) + factor(angle),
+data = offlineSummary, pch = 19, cex = 0.3,
+xlab ="distance")[c(1,2,3), ]
+end.rcode-->
+<p>   
+   We chooseed "00:0f:a3:39:e1:c0", "00:14:bf:3b:c7:c6", and "00:14:bf:b1:97:81"  macAddresses to estimates the signal strength. As we know, "00:0f:a3:39:e1:c0" and "00:14:bf:3b:c7:c6" are located in the room. On the other hand, "00:14:bf:b1:97:81" is located at the outside the room. According to the data, the three macAddresses have strong signal when the distance is close to zero. However, their sigal are weak as the the distance is increasing, especially "00:0f:a3:39:e1:c0" and "00:14:bf:3b:c7:c6". When the distance is more than 23, "00:14:bf:3b:c7:c6" does not have signal. 00:0f:a3:39:e1:c0" does not have signal for " when the distance is more 27. However, "00:14:bf:b1:97:81" has a few signal even though those are extremely low. Therefore, the wall of buildings affect the signal strength, and it shows that the wall of the building can add significant noise to signal strength measurements. In addition, human acitivity activity also affects the signal strength. As Figure 1 of project shows, there are many people at the "00:0f:a3:39:e1:c0", and "00:14:bf:3b:c7:c6" are far from the place where there are many people. 
+</p>
+<p>    
+    Furthermore, the graph shows that the relationship between the signal and the distance to the access point for each of the 3 access points and 8 orientations of the device. According to the graph, the shape of each signal strength is consistent across panels showing curvature in the relationship. Each sginal is very strong when the distance is close to zero. However, the each of the strength of the signal is decreasing as the distance is increasing. For those graph, although there are some signals when distance is more than 25, they are extremely weak, and they all tend to zero when the distance is close to 0. In conclusion, the level of strength signal does not depend on the orientation. It does depends on the distance and physical characteristics of a building and human activity. Therefore, the shape of signal strength is consistent. 
+</p>
+
+<h2>Nearest Neighbor and Cross-validation Methods to Predict Location</h2>
+<h4>Processing the online data</h4>
+<p>
+After we have read in the online data, we used the functions we created in the 
+previous parts to process the lines and clean the data. We realized that there are 
+totally 60 different combinations of posX ad posY. Then we made a list of 
+information showing the signals strengths between the 6 macs and each particular 
+position. It was converted to a data frame, which would be used for prediction later.
+</p>
+<h4>Create a function to predict the locations of the devices</h4>
+<p>
+We have the signal strengths from 6 macs address of all the 60 online data and we 
+want to predict all the 60 locations. In this case, we created a function, which is  
+called predXY(). This function has 4 parameters.  “newSig” is a data frame 
+containing the signal strengths that is used for prediction, “newAngles” is the vector 
+showing the angles of the predicting positions. offline’s summary will be passed into 
+the parameter - “trainData” . And k is the number of closest positions we used for 
+prediction.
+</p>
+<p>
+In this function, the “trainData” will be modified to data frames with signal strengths 
+from 6 macs of all the positions on the same angle. The “newAngles” will match the 
+data of the same angles from the “trainData”. That means, the new orientation with 
+particular 6 signal strengths will match with the signal strengths of the training data 
+on the same angle and produce the closest k positions of (X,Y). The mean of the 
+values of X and Y will be the predicted positions.
+</p>
+<h4>Find best k and cross validation</h4>
+<p>
+To try this function and find out the best k, we compare the 166 known positions of 
+the offline data and the predicted offline positions. We squared all the differences of 
+actual X from predicted X and the differences of actual Y from predicted Y, then sum 
+them up. This will be the error value of each prediction. But we want to know all the 
+accuracy of k from 1:20 and find the best one. Before we use the cross- validation, 
+we need to first reshape our offline data, so that it will have 6 columns of signal 
+strengths from each position and the randomly selected angles.  For cross- 
+validation, we reordered the 166 positions randomly and put them into a matrix 
+with 33 rows and 5 columns as we have chosen 5 as the number of folds. Then the 
+33 positions will be predicted first, and the information of other positions except 
+that 33 positions will be used as the training data. In this case, we predicted all the 
+locations using different values of k. And using the function for computing errors to 
+calculate the error sum of each k. Observing the graph of the errors of different k 
+values, we can see that the errors for the first four k values decrease sharply, and 6 
+is the k with the smallest error.
+<!--begin.rcode echo=FALSE 
+EEoffline = c(2099.000, 1695.750, 1558.889, 1480.562, 1519.360, 1475.056, 1513.204, 1540.922, 1567.877, 1598.320,
+1604.521, 1649.597, 1629.095, 1654.133, 1669.253, 1690.414, 1721.159, 1773.537, 1813.701, 1836.495)
+K = 1:20
+plot(x = K, y = EEoffline, type = "l", xlab = "K values", ylab = "Error Rate")
+end.rcode-->
+</p>
+
+<h2>Conclusions</h2>
+
+<p>
+In this case, we use 6 as the value of k to predict the positions in the test data(online 
+data), using the previous created function – predXY(). Then we found out that the 
+error, using the method we mentioned above, and found that the error is 348.1992.
+</p>
+
+</body>
+</html>
